@@ -3,23 +3,7 @@ A load balancer is a device or software application that distributes incoming ne
 
 In the context of Docker and Nginx, you can set up a load balancer that distributes HTTP(S) or WebSocket traffic across multiple backend services or servers.
 
-### Steps to Install Nginx Using Docker without ssl:
-#### For ubuntu:
-```bash
-sudo apt update
-sudo apt install docker.io
-```
-
-#### For RHEL/CentOS:
-```bash
-sudo yum install -y docker
-```
-
-##### Start and enable Docker if it's not running already:
-```bash
-sudo systemctl start docker
-sudo systemctl enable docker
-```
+### Steps to Install Nginx Using Docker without SSL:
 
 ### Create nginx.conf file:
 ```nginx
@@ -42,31 +26,61 @@ http {
         server [ipv6]:port weight=1; #IPv6 addres
     }
 
-    # weight means distribute loads
     server {
-       listen 80;                      # Listen for IPv4 on port 80
-       listen [::]:80;                  # Listen for IPv6 on port 80
+        listen 80;                        # Listen for IPv4 on port 80
+        listen [::]:80;                    # Listen for IPv6 on port 80
+        server_name example.com;           # Your domain name
+
+        # Redirect HTTP traffic to HTTPS
+        return 301 https://$host$request_uri;
+    }
+
+    # weight means distribute loads
+    listen 443 ssl;                    # Listen for HTTPS (SSL) traffic
+        listen [::]:443 ssl;               # Listen for HTTPS on IPv6
+
+        server_name example.com;           # Your domain name
+
+        # SSL configuration
+        ssl_certificate /etc/nginx/ssl/cert.pem;         # Path to your SSL certificate
+        ssl_certificate_key /etc/nginx/ssl/key.pem;      # Path to your SSL private key
+        ssl_protocols TLSv1.2 TLSv1.3;                    # Secure protocols
+        ssl_ciphers 'TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384';  # Strong ciphers
+
+        # Optional: Redirect to a more secure cipher suite
+        ssl_prefer_server_ciphers on;
 
         location / {
-            proxy_pass http://api_gateways;  # Direct traffic to the API Gateway upstream
+            proxy_pass http://api_gateways;             # Direct traffic to the API Gateway upstream
             proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
         }
-    }
 }
 ```
 
 ### Create Dockerfile:
 ```dockerfile
+# Use official Nginx image as the base image
 FROM nginx:latest
 
-# Copy the custom NGINX configuration into the container
+# Set the maintainer label
+# LABEL maintainer="yourname@example.com"
+
+# Copy the Nginx configuration file to the container
 COPY nginx.conf /etc/nginx/nginx.conf
 
-# Expose port 80 for HTTP traffic (or 443 for HTTPS if needed)
+# Copy SSL certificate and key to the container (replace with your actual paths)
+COPY ./ssl/cert.pem /etc/nginx/ssl/cert.pem
+COPY ./ssl/key.pem /etc/nginx/ssl/key.pem
+
+# Expose ports for HTTP and HTTPS
 EXPOSE 80
+EXPOSE 443
+
+# Start Nginx
+CMD ["nginx", "-g", "daemon off;"]
 ```
 
 ### Run command to build docker for load-balancer:
@@ -106,4 +120,4 @@ xxxx:xxx:xxx:xx::xxxx api_gateways
 ```
 
 #### Next:
-- [Load Balancer with SSL](load-balancer-with-ssl.md)
+- [Load Balancer without SSL](README.md)
